@@ -19,16 +19,13 @@
 #define ADC_PACKET_LENGHT (ADC_BUF_SIZE + 6)
 //ADC_Result_t ADC_Res[2][ADC_BUF_SIZE];  //Bufor na dane
 
-uint8_t AdcPacket[2][ADC_PACKET_LENGHT];	//Ramka gotowa do wys³ania [Nag³ówek, Rozkaz, D³ugoœæ, Dane (2*500), CRC]
+// Ramka gotowa do wys³ania [Nag³ówek, Rozkaz, D³ugoœæ, Dane (2*500), CRC]
+uint8_t AdcPacket[2][ADC_PACKET_LENGHT];	
 
-// Na razie na sztywno
-// Nag³ówek
+// strona zawieraj¹ca wyniki
+volatile uint8_t ADC_Res_Page;	
 
-
-volatile uint8_t ADC_Res_Page;								//Strona zawieraj¹ca wyniki
-
-void SendData()
-{
+void SendData() {
 	AdcPacket[0][0] = PKT_HEADER; // Nag³ówek
 	AdcPacket[1][0] = PKT_HEADER;
 
@@ -47,43 +44,40 @@ void SendData()
 	DMA_InitTransfer(*(AdcPacket + ADC_Res_Page), ADC_PACKET_LENGHT);
 }
 
-ISR(DMA_CH0_vect)
-{
+ISR(DMA_CH0_vect) {
 	ADC_Res_Page=0;
-	DMA_CH0_CTRLB=DMA_CH_TRNINTLVL_LO_gc | DMA_CH_TRNIF_bm;  //Skasuj flagê przerwania
+	// skasuj flagê przerwania
+	DMA_CH0_CTRLB=DMA_CH_TRNINTLVL_LO_gc | DMA_CH_TRNIF_bm;  
 	SendData();
 	PORTD_OUTCLR = PIN2_bm;
-
 }
 
-ISR(DMA_CH1_vect)
-{
+ISR(DMA_CH1_vect) {
 	ADC_Res_Page=1;
-	DMA_CH1_CTRLB=DMA_CH_TRNINTLVL_LO_gc | DMA_CH_TRNIF_bm;  //Skasuj flagê przerwania
+	// skasuj flagê przerwania
+	DMA_CH1_CTRLB=DMA_CH_TRNINTLVL_LO_gc | DMA_CH_TRNIF_bm;  
 	SendData();
-
 }
 
-uint8_t ReadCalibrationByte(uint8_t index)
-{
+uint8_t ReadCalibrationByte(uint8_t index) {
 	uint8_t result;
-
-	NVM_CMD=NVM_CMD_READ_CALIB_ROW_gc; //Odczytaj sygnaturê produkcyjn¹
+	// odczytaj sygnaturê produkcyjn¹
+	NVM_CMD=NVM_CMD_READ_CALIB_ROW_gc; 
 	result=pgm_read_byte(index);
-
-	NVM_CMD=NVM_CMD_NO_OPERATION_gc;   //Przywróæ normalne dzia³anie NVM
+	// przywróæ normalne dzia³anie NVM
+	NVM_CMD=NVM_CMD_NO_OPERATION_gc;   
 	return result;
 }
 
-void ADC_CH_Init(ADC_CH_t *adcch, register8_t muxpos)
-{
-	adcch->CTRL=ADC_CH_INPUTMODE_SINGLEENDED_gc;  //Tryb pojedynczego wejœcia ze znakiem
-	adcch->MUXCTRL=muxpos;                        //Pin wejœcia dodatniego
+void ADC_CH_Init(ADC_CH_t *adcch, register8_t muxpos) {
+	// tryb pojedynczego wejœcia ze znakiem
+	adcch->CTRL=ADC_CH_INPUTMODE_SINGLEENDED_gc;  
+	// pin wejœcia dodatniego
+	adcch->MUXCTRL=muxpos;                        
 }
 
-
-void Timer_Init() // Generator zdarzenia wykonania pomiaru
-{
+// generator zdarzenia wykonania pomiaru
+void Timer_Init() {
 	TCC0.CTRLB=TC_WGMODE_NORMAL_gc;			//Zwyk³y tryb pracy timera
 	//TCC0.PER=3125;						//Dla 100ms
 	TCC0.PER=1250;							//Dla 10ms
@@ -93,12 +87,14 @@ void Timer_Init() // Generator zdarzenia wykonania pomiaru
 }
 
 
-void DMA_CH_Init(DMA_CH_t *DMA_CH, uint16_t DstAddr)
-{
-	DMA_CH->ADDRCTRL = DMA_CH_SRCDIR_INC_gc | DMA_CH_DESTDIR_INC_gc | DMA_CH_SRCRELOAD_BURST_gc | DMA_CH_DESTRELOAD_BLOCK_gc;
-	DMA_CH->TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH0_gc; //Transfer wyzwala zakoñczenie konwersji w CH0
+void DMA_CH_Init(DMA_CH_t *DMA_CH, uint16_t DstAddr) {
+	DMA_CH->ADDRCTRL =	DMA_CH_SRCDIR_INC_gc | DMA_CH_DESTDIR_INC_gc | 
+						DMA_CH_SRCRELOAD_BURST_gc | DMA_CH_DESTRELOAD_BLOCK_gc;
+	// transfer wyzwala zakoñczenie konwersji w CH0
+	DMA_CH->TRIGSRC = DMA_CH_TRIGSRC_ADCA_CH0_gc; 
 	DMA_CH->TRFCNT = ADC_BUF_SIZE;
-	DMA_CH->REPCNT = 0;  //Powtarzamy w nieskoñczonoœæ
+	// powtarzamy w nieskoñczonoœæ
+	DMA_CH->REPCNT = 0;  
 	DMA_CH->SRCADDR0 = ((uint16_t)&ADCA_CH0RES) & 0xff;
 	DMA_CH->SRCADDR1 = ((uint16_t)&ADCA_CH0RES) >> 8;
 	DMA_CH->SRCADDR2 = 0;
@@ -106,31 +102,34 @@ void DMA_CH_Init(DMA_CH_t *DMA_CH, uint16_t DstAddr)
 	DMA_CH->DESTADDR1 = DstAddr >> 8;
 	DMA_CH->DESTADDR2 = 0;
 	DMA_CH->CTRLB = DMA_CH_TRNINTLVL_HI_gc;
-	DMA_CH->CTRLA = DMA_CH_ENABLE_bm | DMA_CH_SINGLE_bm | DMA_CH_BURSTLEN_2BYTE_gc | DMA_CH_REPEAT_bm; //Tryb single, transferujemy na raz 2 bajtów
+	// tryb single, transferujemy na raz 2 bajtów
+	DMA_CH->CTRLA = DMA_CH_ENABLE_bm | DMA_CH_SINGLE_bm | DMA_CH_BURSTLEN_2BYTE_gc 
+					| DMA_CH_REPEAT_bm; 
 }
 
-void DMA_Init()
-{
+void DMA_Init() {
 	DMA_CH_Init(&DMA.CH0, (uint16_t)&AdcPacket[0][4]);
 	DMA_CH_Init(&DMA.CH1, (uint16_t)&AdcPacket[1][4]);
-	DMA.CTRL=DMA_ENABLE_bm | DMA_DBUFMODE_CH01_gc;    //Odblokuj DMAC, podwójne buforowanie prze kana³y 0 i 1, round-robin
+	// Odblokuj DMAC, podwójne buforowanie prze kana³y 0 i 1, round-robin
+	DMA.CTRL=DMA_ENABLE_bm | DMA_DBUFMODE_CH01_gc;    
 }
 
-void ADC_Init()
-{
-	ADCA.CTRLA=ADC_ENABLE_bm; //| ADC_DMASEL_CH0123_gc;   //Wszystkie kana³y wyzwalaj¹ transfer DMA
-	ADCA.CTRLB=ADC_CONMODE_bm;                         //Rozdzielczoœæ 12 bitów, tryb ze znakiem
-	ADCA.REFCTRL=ADC_REFSEL_INT1V_gc | ADC_BANDGAP_bm; //Referencja 1V
-	//ADCA.EVCTRL=ADC_SWEEP_0_gc | ADC_EVSEL0_bm | ADC_EVACT_SWEEP_gc; //Wyzwalanie kana³ów 0, 1, 2 i 3 przez EVCH0
-	ADCA.EVCTRL=ADC_EVSEL_0123_gc | ADC_SWEEP_0_gc | ADC_EVACT_SWEEP_gc; //Wyzwalanie kana³ów 0 przez EVCH0
+void ADC_Init() {
+	// Wszystkie kana³y wyzwalaj¹ transfer DMA
+	ADCA.CTRLA=ADC_ENABLE_bm;  
+	// Rozdzielczoœæ 12 bitów, tryb ze znakiem
+	ADCA.CTRLB=ADC_CONMODE_bm;
+	// Referencja 1V                      
+	ADCA.REFCTRL=ADC_REFSEL_INT1V_gc | ADC_BANDGAP_bm;
+	//Wyzwalanie kana³ów 0 przez EVCH0
+	ADCA.EVCTRL=ADC_EVSEL_0123_gc | ADC_SWEEP_0_gc | ADC_EVACT_SWEEP_gc; 
 	ADCA.PRESCALER=ADC_PRESCALER_DIV32_gc;     //CLKADC=1 MHz
+	// Kalibracja kana³ów ADC
 	ADCA.CALL=ReadCalibrationByte(offsetof(NVM_PROD_SIGNATURES_t, ADCACAL0));
 	ADCA.CALH=ReadCalibrationByte(offsetof(NVM_PROD_SIGNATURES_t, ADCACAL1));
-
-	ADC_CH_Init(&ADCA.CH0, ADC_CH_MUXPOS_PIN0_gc);   //Zainicjuj poszczególne kana³y ADC
-	//ADC_CH_Init(&ADCA.CH1, ADC_CH_MUXPOS_PIN1_gc);
-	//ADC_CH_Init(&ADCA.CH2, ADC_CH_MUXPOS_PIN2_gc);
-	//ADC_CH_Init(&ADCA.CH3, ADC_CH_MUXPOS_PIN3_gc);
+	// Inicjacja poszczegolnych kanalow ADC
+	ADC_CH_Init(&ADCA.CH0, ADC_CH_MUXPOS_PIN0_gc);   
+	
 	DMA_Init();
 	Timer_Init();	
 }

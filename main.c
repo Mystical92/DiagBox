@@ -19,23 +19,28 @@
 #include "ADC.h"
 #include "ClockConfig.h"
 
-
-CircBuffer recBuf;				//Deklaracja struktury bufora ko³owego s³u¿¹cego do odbioru danych
+// deklaracja struktury bufora ko³owego s³u¿¹cego do odbioru danych
+CircBuffer recBuf;				
 uint8_t bufor[MAX_PKTLEN];
-Pakiet *pkt=(Pakiet*)bufor;		// rzutowanie tablicy uint8_t na wskaŸnik typu Pakiet i przypisanie wskaŸnikowi *pkt
+
+// rzutowanie tablicy uint8_t na wskaŸnik typu Pakiet i przypisanie wskaŸnikowi *pkt
+Pakiet *pkt=(Pakiet*)bufor;		
 uint8_t global_counter_send = 0;
 
-// Inicjalizacja komunikacji pomiêdzy modu³em BT,a MCU
-
+// inicjalizacja komunikacji pomiêdzy modu³em BT,a MCU
 void USART_init()
 {
 	PORTF_OUTSET=PIN3_bm;
 	PORTF_DIRSET=PIN3_bm;
-	USARTF0.CTRLB=USART_RXEN_bm | USART_TXEN_bm;	//W³¹cz odbiornik oraz nadajnik USART
-	USARTF0.CTRLC=USART_CHSIZE_8BIT_gc;				//Ramka 8 bitów, bez parzystoœci, 1 bit stopu
+	// wlacz odbiornik oraz nadajnik USART
+	USARTF0.CTRLB=USART_RXEN_bm | USART_TXEN_bm;	
+	// ramka 8 bitów, bez parzystoœci, 1 bit stopu
+	USARTF0.CTRLC=USART_CHSIZE_8BIT_gc;				
 	usart_set_baudrate(&USARTF0, 115200, F_CPU);
-	USARTF0.CTRLA=USART_RXCINTLVL_HI_gc;			//Odblokuj przerwania odbiornika
-	DMA_init();										//Zainicjuj DMA dla nadajnika USARTF0
+	// odblokuj przerwania odbiornika
+	USARTF0.CTRLA=USART_RXCINTLVL_HI_gc;			
+	// zainicjuj DMA dla nadajnika USARTF0
+	DMA_init();										
 }
 
 void CheckForPacket_TimerInit()
@@ -47,8 +52,7 @@ void CheckForPacket_TimerInit()
 	TCC1.INTCTRLA = TC_OVFINTLVL_MED_gc;    //W³¹czenie przerwania
 }
 
-// Przerwanie wywo³ywane w zwi¹zku z przyjœciem znaku do MCU
-
+// przerwanie wywo³ywane w zwi¹zku z przyjœciem znaku do MCU
 ISR(USARTF0_RXC_vect)
 {
 	cb_Add(&recBuf, USARTF0_DATA);		
@@ -83,10 +87,7 @@ int main(void)
 	ADC_Init();
 	CheckForPacket_TimerInit();
 
-	
-	
-    while(1)
-    {
+    while(1) {
 
     }
 }
